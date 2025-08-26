@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.14;
+pragma solidity ^0.8.24;
 
 /// @title MockUSDC - minimal 6-decimal ERC20 for testing FantasyCore
 contract MockUSDC {
