@@ -1,97 +1,59 @@
 'use client';
 
 import { useAccount } from 'wagmi';
-import { useOwnedPlayerIds, usePlayer, useQuoteSellReturn, useCurrentGameweek, useChipBalance } from '@/lib/contracts/hooks';
+import { useOwnedPlayerIds, useQuoteSellReturn, useChipBalance } from '@/lib/contracts/hooks';
 import { formatChips } from '@/lib/utils/format';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { SquadPlayer } from '@/lib/contracts/types';
-import { useReadContract } from 'wagmi';
-import { CONTRACT_ADDRESSES } from '@/lib/contracts/config';
-import FantasyCoreABI from '@/lib/abis/FantasyCore.json';
-import GameweekPointsStoreABI from '@/lib/abis/GameweekPointsStore.json';
+import { useFPLCurrentGameweek, useFPLLiveData, useFPLPlayers } from '@/lib/hooks/useFPLData';
 import toast from 'react-hot-toast';
 
-interface LivePlayerStats {
-  playerId: bigint;
-  currentPoints: number;
-  minutesPlayed: number;
-  goals: number;
-  assists: number;
-  yellowCards: number;
-  redCards: number;
-  saves: number;
-  status: 'not_started' | 'playing' | 'benched' | 'finished';
+interface SquadPlayerWithFPL {
+  blockchainId: bigint;
+  shares: bigint;
+  currentValue: bigint;
+  fplData?: any;
+  liveStats?: any;
 }
 
 export default function SquadPage() {
   const { address, isConnected } = useAccount();
   const { data: ownedPlayerIds } = useOwnedPlayerIds(address);
-  const { data: currentGameweek } = useCurrentGameweek();
   const { data: chipBalance } = useChipBalance(address);
-  const [squad, setSquad] = useState<SquadPlayer[]>([]);
-  const [liveStats, setLiveStats] = useState<Map<string, LivePlayerStats>>(new Map());
+  const { gameweek: currentGameweek } = useFPLCurrentGameweek();
+  const { liveData } = useFPLLiveData(currentGameweek?.id || null);
+  const { players: fplPlayers } = useFPLPlayers();
+  
+  const [squad, setSquad] = useState<SquadPlayerWithFPL[]>([]);
   const [totalValue, setTotalValue] = useState(0n);
   const [loading, setLoading] = useState(true);
   const [isLive, setIsLive] = useState(false);
   const [currentGWPoints, setCurrentGWPoints] = useState(0);
   const [projectedChips, setProjectedChips] = useState(0n);
 
-  // Simulate live updates
+  // Build squad with FPL data
   useEffect(() => {
-    const interval = setInterval(() => {
-      if (isLive && ownedPlayerIds) {
-        const newLiveStats = new Map<string, LivePlayerStats>();
-        
-        ownedPlayerIds.forEach(playerId => {
-          const existing = liveStats.get(playerId.toString());
-          const isPlaying = Math.random() > 0.3;
-          
-          newLiveStats.set(playerId.toString(), {
-            playerId,
-            currentPoints: existing?.currentPoints || Math.floor(Math.random() * 15),
-            minutesPlayed: Math.min(90, (existing?.minutesPlayed || 0) + (isPlaying ? 5 : 0)),
-            goals: existing?.goals || (Math.random() > 0.9 ? 1 : 0),
-            assists: existing?.assists || (Math.random() > 0.85 ? 1 : 0),
-            yellowCards: existing?.yellowCards || (Math.random() > 0.95 ? 1 : 0),
-            redCards: 0,
-            saves: existing?.saves || (Math.random() > 0.8 ? Math.floor(Math.random() * 3) : 0),
-            status: isPlaying ? 'playing' : 'benched',
-          });
-        });
-        
-        setLiveStats(newLiveStats);
-      }
-    }, 5000); // Update every 5 seconds
-
-    return () => clearInterval(interval);
-  }, [isLive, ownedPlayerIds, liveStats]);
-
-  useEffect(() => {
-    const fetchSquadData = async () => {
+    const buildSquad = async () => {
       if (!ownedPlayerIds || !address) return;
 
-      const squadData: SquadPlayer[] = [];
+      const squadData: SquadPlayerWithFPL[] = [];
       let total = 0n;
 
       for (const playerId of ownedPlayerIds) {
-        // Mock fetching player data - in production use proper contract reads
-        const mockPlayerData = [
-          BigInt(1000) * BigInt(10 ** 18), // basePrice
-          BigInt(100), // totalShares
-          BigInt(10) // slope
-        ];
-
+        // Mock shares and value - in production get from contract
         const mockShares = BigInt(5);
         const mockSellValue = BigInt(5000) * BigInt(10 ** 18);
 
+        // Find FPL data for this player
+        const fplPlayer = fplPlayers?.find(p => p.blockchainId === playerId);
+        const playerLiveStats = liveData?.find(l => l.blockchainId === playerId.toString());
+
         squadData.push({
-          playerId,
+          blockchainId: playerId,
           shares: mockShares,
-          basePrice: mockPlayerData[0],
-          totalShares: mockPlayerData[1],
-          lastGameweekPoints: BigInt(Math.floor(Math.random() * 15)),
           currentValue: mockSellValue,
+          fplData: fplPlayer?.fplData,
+          liveStats: playerLiveStats,
         });
 
         total += mockSellValue;
@@ -102,25 +64,24 @@ export default function SquadPage() {
       setLoading(false);
     };
 
-    fetchSquadData();
-  }, [ownedPlayerIds, address]);
+    buildSquad();
+  }, [ownedPlayerIds, address, fplPlayers, liveData]);
 
   // Calculate current gameweek points and projected chips
   useEffect(() => {
     let points = 0;
     let chips = 0n;
     
-    liveStats.forEach((stats, playerId) => {
-      points += stats.currentPoints;
-      const playerSquad = squad.find(p => p.playerId.toString() === playerId);
-      if (playerSquad) {
-        chips += BigInt(stats.currentPoints) * playerSquad.shares * BigInt(10 ** 18);
+    squad.forEach((player) => {
+      if (player.liveStats?.stats) {
+        points += player.liveStats.stats.total_points;
+        chips += BigInt(player.liveStats.stats.total_points) * player.shares * BigInt(10 ** 18);
       }
     });
     
     setCurrentGWPoints(points);
     setProjectedChips(chips);
-  }, [liveStats, squad]);
+  }, [squad]);
 
   if (!isConnected) {
     return (
@@ -147,20 +108,24 @@ export default function SquadPage() {
     );
   }
 
+  const hasLiveGames = currentGameweek && !currentGameweek.finished && currentGameweek.is_current;
+
   return (
     <div className="max-w-7xl mx-auto">
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-bold">My Squad</h1>
-        <button
-          onClick={() => setIsLive(!isLive)}
-          className={`px-6 py-2 rounded-lg font-semibold transition ${
-            isLive 
-              ? 'bg-red-600 text-white animate-pulse' 
-              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-          }`}
-        >
-          {isLive ? '🔴 LIVE' : 'Enable Live Tracking'}
-        </button>
+        {hasLiveGames && (
+          <button
+            onClick={() => setIsLive(!isLive)}
+            className={`px-6 py-2 rounded-lg font-semibold transition ${
+              isLive 
+                ? 'bg-red-600 text-white animate-pulse' 
+                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+            }`}
+          >
+            {isLive ? '🔴 LIVE' : 'Enable Live Tracking'}
+          </button>
+        )}
       </div>
 
       {/* Squad Summary */}
@@ -180,13 +145,13 @@ export default function SquadPage() {
           </div>
           <div>
             <p className="text-sm text-gray-600">Current GW</p>
-            <p className="text-2xl font-bold">GW{currentGameweek?.toString() || '0'}</p>
+            <p className="text-2xl font-bold">GW{currentGameweek?.id || '0'}</p>
           </div>
-          <div className={isLive ? 'animate-pulse' : ''}>
+          <div className={isLive && hasLiveGames ? 'animate-pulse' : ''}>
             <p className="text-sm text-gray-600">Live Points</p>
             <p className="text-2xl font-bold text-purple-600">{currentGWPoints}</p>
           </div>
-          <div className={isLive ? 'animate-pulse' : ''}>
+          <div className={isLive && hasLiveGames ? 'animate-pulse' : ''}>
             <p className="text-sm text-gray-600">Projected Chips</p>
             <p className="text-2xl font-bold text-orange-600">{formatChips(projectedChips)}</p>
           </div>
@@ -194,29 +159,38 @@ export default function SquadPage() {
       </div>
 
       {/* Live Match Status (if live) */}
-      {isLive && (
+      {isLive && hasLiveGames && (
         <div className="bg-gradient-to-r from-red-50 to-orange-50 rounded-lg shadow-md p-6 mb-8 border-2 border-red-200">
           <h3 className="text-lg font-semibold mb-4 flex items-center">
             <span className="w-3 h-3 bg-red-600 rounded-full animate-pulse mr-2"></span>
-            Live Gameweek {currentGameweek?.toString()} Updates
+            Live Gameweek {currentGameweek?.id} Updates
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="bg-white rounded p-3">
               <p className="text-sm text-gray-600">Players Playing</p>
               <p className="text-xl font-bold">
-                {Array.from(liveStats.values()).filter(s => s.status === 'playing').length}
+                {squad.filter(p => p.liveStats?.stats?.minutes > 0).length}
               </p>
             </div>
             <div className="bg-white rounded p-3">
               <p className="text-sm text-gray-600">Total Goals</p>
               <p className="text-xl font-bold text-green-600">
-                {Array.from(liveStats.values()).reduce((sum, s) => sum + s.goals, 0)}
+                {squad.reduce((sum, p) => sum + (p.liveStats?.stats?.goals_scored || 0), 0)}
               </p>
             </div>
             <div className="bg-white rounded p-3">
               <p className="text-sm text-gray-600">Total Assists</p>
               <p className="text-xl font-bold text-blue-600">
-                {Array.from(liveStats.values()).reduce((sum, s) => sum + s.assists, 0)}
+                {squad.reduce((sum, p) => sum + (p.liveStats?.stats?.assists || 0), 0)}
+              </p>
+            </div>
+            <div className="bg-white rounded p-3">
+              <p className="text-sm text-gray-600">Average BPS</p>
+              <p className="text-xl font-bold text-purple-600">
+                {squad.length > 0 
+                  ? Math.round(squad.reduce((sum, p) => sum + (p.liveStats?.stats?.bps || 0), 0) / squad.length)
+                  : 0
+                }
               </p>
             </div>
           </div>
@@ -231,11 +205,14 @@ export default function SquadPage() {
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Player
               </th>
-              {isLive && (
+              {isLive && hasLiveGames && (
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Status
                 </th>
               )}
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Position
+              </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Shares
               </th>
@@ -243,9 +220,9 @@ export default function SquadPage() {
                 Current Value
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                {isLive ? 'Live Points' : 'Last GW Points'}
+                {isLive && hasLiveGames ? 'Live Points' : 'Total Points'}
               </th>
-              {isLive && (
+              {isLive && hasLiveGames && (
                 <>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Live Stats
@@ -262,31 +239,34 @@ export default function SquadPage() {
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {squad.map((player) => {
-              const liveData = liveStats.get(player.playerId.toString());
+              const isPlaying = player.liveStats?.stats?.minutes > 0;
               return (
-                <tr key={player.playerId.toString()} className={liveData?.status === 'playing' ? 'bg-green-50' : ''}>
+                <tr key={player.blockchainId.toString()} className={isPlaying && isLive ? 'bg-green-50' : ''}>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <Link
-                      href={`/players/${player.playerId}`}
+                      href={`/players/${player.blockchainId}`}
                       className="text-blue-600 hover:underline font-semibold"
                     >
-                      Player #{player.playerId.toString()}
+                      {player.fplData?.web_name || `Player #${player.blockchainId.toString()}`}
                     </Link>
+                    {player.fplData && (
+                      <p className="text-xs text-gray-500">{player.liveStats?.team || 'Unknown'}</p>
+                    )}
                   </td>
-                  {isLive && (
+                  {isLive && hasLiveGames && (
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`px-2 py-1 rounded text-xs font-semibold ${
-                        liveData?.status === 'playing' 
+                        isPlaying
                           ? 'bg-green-100 text-green-800 animate-pulse' 
-                          : liveData?.status === 'benched'
-                          ? 'bg-yellow-100 text-yellow-800'
                           : 'bg-gray-100 text-gray-800'
                       }`}>
-                        {liveData?.status === 'playing' ? `Playing (${liveData.minutesPlayed}')` : 
-                         liveData?.status || 'Not Started'}
+                        {isPlaying ? `Playing (${player.liveStats.stats.minutes}')` : 'Not Playing'}
                       </span>
                     </td>
                   )}
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    {player.liveStats?.position || '-'}
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     {player.shares.toString()}
                   </td>
@@ -294,33 +274,40 @@ export default function SquadPage() {
                     {formatChips(player.currentValue)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`font-semibold ${isLive && liveData ? 'text-purple-600' : ''}`}>
-                      {isLive && liveData ? liveData.currentPoints : player.lastGameweekPoints.toString()}
+                    <span className={`font-semibold ${isLive && hasLiveGames && player.liveStats ? 'text-purple-600' : ''}`}>
+                      {isLive && hasLiveGames && player.liveStats?.stats 
+                        ? player.liveStats.stats.total_points 
+                        : player.fplData?.total_points || 0}
                     </span>
                   </td>
-                  {isLive && (
+                  {isLive && hasLiveGames && (
                     <>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        {liveData && (
+                        {player.liveStats?.stats && (
                           <div className="flex gap-2 text-xs">
-                            {liveData.goals > 0 && (
+                            {player.liveStats.stats.goals_scored > 0 && (
                               <span className="bg-green-100 text-green-800 px-2 py-1 rounded">
-                                ⚽ {liveData.goals}
+                                ⚽ {player.liveStats.stats.goals_scored}
                               </span>
                             )}
-                            {liveData.assists > 0 && (
+                            {player.liveStats.stats.assists > 0 && (
                               <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded">
-                                🅰️ {liveData.assists}
+                                🅰️ {player.liveStats.stats.assists}
                               </span>
                             )}
-                            {liveData.yellowCards > 0 && (
+                            {player.liveStats.stats.yellow_cards > 0 && (
                               <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
-                                🟨 {liveData.yellowCards}
+                                🟨 {player.liveStats.stats.yellow_cards}
                               </span>
                             )}
-                            {liveData.saves > 0 && (
+                            {player.liveStats.stats.saves > 0 && (
                               <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded">
-                                🧤 {liveData.saves}
+                                🧤 {player.liveStats.stats.saves}
+                              </span>
+                            )}
+                            {player.liveStats.stats.bonus > 0 && (
+                              <span className="bg-orange-100 text-orange-800 px-2 py-1 rounded">
+                                ⭐ {player.liveStats.stats.bonus}
                               </span>
                             )}
                           </div>
@@ -328,9 +315,9 @@ export default function SquadPage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className="text-orange-600 font-semibold">
-                          {liveData ? 
-                            formatChips(BigInt(liveData.currentPoints) * player.shares * BigInt(10 ** 18)) : 
-                            '0'
+                          {player.liveStats?.stats 
+                            ? formatChips(BigInt(player.liveStats.stats.total_points) * player.shares * BigInt(10 ** 18))
+                            : '0'
                           }
                         </span>
                       </td>
@@ -339,19 +326,19 @@ export default function SquadPage() {
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex gap-2">
                       <Link
-                        href={`/trade?action=buy&player=${player.playerId}`}
+                        href={`/trade?action=buy&player=${player.blockchainId}`}
                         className="text-green-600 hover:underline"
                       >
                         Buy
                       </Link>
                       <Link
-                        href={`/trade?action=sell&player=${player.playerId}`}
+                        href={`/trade?action=sell&player=${player.blockchainId}`}
                         className="text-red-600 hover:underline"
                       >
                         Sell
                       </Link>
                       <Link
-                        href={`/players/${player.playerId}`}
+                        href={`/players/${player.blockchainId}`}
                         className="text-blue-600 hover:underline"
                       >
                         Stats
@@ -364,6 +351,66 @@ export default function SquadPage() {
           </tbody>
         </table>
       </div>
+
+      {/* FPL Stats Summary */}
+      {squad.some(p => p.fplData) && (
+        <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <h3 className="text-lg font-semibold mb-3">Top Performers</h3>
+            <div className="space-y-2">
+              {squad
+                .filter(p => p.fplData)
+                .sort((a, b) => (b.fplData?.total_points || 0) - (a.fplData?.total_points || 0))
+                .slice(0, 3)
+                .map(player => (
+                  <div key={player.blockchainId.toString()} className="flex justify-between">
+                    <span>{player.fplData.web_name}</span>
+                    <span className="font-bold">{player.fplData.total_points} pts</span>
+                  </div>
+                ))}
+            </div>
+          </div>
+          
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <h3 className="text-lg font-semibold mb-3">Best Form</h3>
+            <div className="space-y-2">
+              {squad
+                .filter(p => p.fplData)
+                .sort((a, b) => parseFloat(b.fplData?.form || '0') - parseFloat(a.fplData?.form || '0'))
+                .slice(0, 3)
+                .map(player => (
+                  <div key={player.blockchainId.toString()} className="flex justify-between">
+                    <span>{player.fplData.web_name}</span>
+                    <span className="font-bold text-green-600">
+                      {parseFloat(player.fplData.form).toFixed(1)}
+                    </span>
+                  </div>
+                ))}
+            </div>
+          </div>
+          
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <h3 className="text-lg font-semibold mb-3">Most Selected</h3>
+            <div className="space-y-2">
+              {squad
+                .filter(p => p.fplData)
+                .sort((a, b) => 
+                  parseFloat(b.fplData?.selected_by_percent || '0') - 
+                  parseFloat(a.fplData?.selected_by_percent || '0')
+                )
+                .slice(0, 3)
+                .map(player => (
+                  <div key={player.blockchainId.toString()} className="flex justify-between">
+                    <span>{player.fplData.web_name}</span>
+                    <span className="font-bold">
+                      {parseFloat(player.fplData.selected_by_percent).toFixed(1)}%
+                    </span>
+                  </div>
+                ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Quick Actions */}
       <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
