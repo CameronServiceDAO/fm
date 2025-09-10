@@ -1,40 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { usePlayer, useQuoteBuyCost, useQuoteSellReturn, useCurrentGameweek } from '@/lib/contracts/hooks';
+import { usePlayer, useQuoteBuyCost, useQuoteSellReturn } from '@/lib/contracts/hooks';
 import { formatChips } from '@/lib/utils/format';
 import { useAccount } from 'wagmi';
-import { useReadContract } from 'wagmi';
-import { CONTRACT_ADDRESSES } from '@/lib/contracts/config';
-import GameweekPointsStoreABI from '@/lib/abis/GameweekPointsStore.json';
-import { Line } from 'recharts';
-import { LineChart, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { useFPLPlayer, useFPLPlayerLiveStats, useFPLCurrentGameweek } from '@/lib/hooks/useFPLData';
+import { LineChart, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Line } from 'recharts';
 import toast from 'react-hot-toast';
-
-interface PlayerStats {
-  minutesPlayed: number;
-  goals: number;
-  assists: number;
-  cleanSheets: number;
-  yellowCards: number;
-  redCards: number;
-  saves: number;
-  bonus: number;
-}
-
-interface GameweekPerformance {
-  gameweek: number;
-  points: number;
-  chipsEarned: bigint;
-}
-
-interface Fixture {
-  gameweek: number;
-  opponent: string;
-  home: boolean;
-  date: string;
-}
 
 export default function PlayerDetailPage() {
   const params = useParams();
@@ -42,57 +15,30 @@ export default function PlayerDetailPage() {
   const { address } = useAccount();
   const playerId = BigInt(params.id as string);
   
+  // Blockchain data
   const { data: player } = usePlayer(playerId);
   const { data: buyPrice } = useQuoteBuyCost(playerId, 1n);
   const { data: sellPrice } = useQuoteSellReturn(playerId, 1n);
-  const { data: currentGameweek } = useCurrentGameweek();
+  
+  // FPL data
+  const { player: fplPlayer, isLoading: fplLoading } = useFPLPlayer(playerId);
+  const { gameweek: currentGameweek } = useFPLCurrentGameweek();
+  const { stats: liveStats } = useFPLPlayerLiveStats(
+    playerId,
+    currentGameweek?.id || null
+  );
 
   const [activeTab, setActiveTab] = useState<'overview' | 'stats' | 'history' | 'fixtures'>('overview');
   const [tradeAmount, setTradeAmount] = useState('1');
-  const [stats, setStats] = useState<PlayerStats | null>(null);
-  const [performances, setPerformances] = useState<GameweekPerformance[]>([]);
-  const [fixtures, setFixtures] = useState<Fixture[]>([]);
 
-  // Fetch player stats and performances
-  useEffect(() => {
-    // Mock data - in production, fetch from indexer or backend
-    setStats({
-      minutesPlayed: 2340,
-      goals: 12,
-      assists: 8,
-      cleanSheets: 15,
-      yellowCards: 3,
-      redCards: 0,
-      saves: 0,
-      bonus: 24,
-    });
-
-    // Mock performance history
-    const mockPerformances: GameweekPerformance[] = [];
-    for (let i = 1; i <= Number(currentGameweek || 0); i++) {
-      mockPerformances.push({
-        gameweek: i,
-        points: Math.floor(Math.random() * 15),
-        chipsEarned: BigInt(Math.floor(Math.random() * 1000)) * BigInt(10 ** 18),
-      });
-    }
-    setPerformances(mockPerformances);
-
-    // Mock fixtures
-    setFixtures([
-      { gameweek: Number(currentGameweek || 0) + 1, opponent: 'Liverpool', home: true, date: '2025-09-14' },
-      { gameweek: Number(currentGameweek || 0) + 2, opponent: 'Arsenal', home: false, date: '2025-09-21' },
-      { gameweek: Number(currentGameweek || 0) + 3, opponent: 'Chelsea', home: true, date: '2025-09-28' },
-      { gameweek: Number(currentGameweek || 0) + 4, opponent: 'Man United', home: false, date: '2025-10-05' },
-      { gameweek: Number(currentGameweek || 0) + 5, opponent: 'Tottenham', home: true, date: '2025-10-12' },
-    ]);
-  }, [currentGameweek]);
-
-  if (!player) {
-    return <div className="animate-pulse bg-gray-200 h-screen"></div>;
+  if (!player || fplLoading) {
+    return (
+      <div className="animate-pulse bg-gray-200 h-screen"></div>
+    );
   }
 
   const [basePrice, shares, slope] = player;
+  const fplData = fplPlayer?.fplData;
 
   const handleBuy = () => {
     router.push(`/trade?action=buy&player=${playerId}&amount=${tradeAmount}`);
@@ -102,11 +48,12 @@ export default function PlayerDetailPage() {
     router.push(`/trade?action=sell&player=${playerId}&amount=${tradeAmount}`);
   };
 
-  const chartData = performances.map(p => ({
-    gameweek: `GW${p.gameweek}`,
-    points: p.points,
-    chips: Number(p.chipsEarned) / (10 ** 18),
-  }));
+  // Prepare chart data from FPL history
+  const chartData = fplData ? Array.from({ length: currentGameweek?.id || 0 }, (_, i) => ({
+    gameweek: `GW${i + 1}`,
+    points: Math.floor(Math.random() * 15), // Would use actual history data
+    form: parseFloat(fplData.form),
+  })) : [];
 
   return (
     <div className="max-w-6xl mx-auto">
@@ -114,8 +61,20 @@ export default function PlayerDetailPage() {
       <div className="bg-white rounded-lg shadow-md p-6 mb-6">
         <div className="flex justify-between items-start">
           <div>
-            <h1 className="text-3xl font-bold mb-2">Player #{playerId.toString()}</h1>
-            <p className="text-gray-600">Forward • Manchester City</p>
+            <h1 className="text-3xl font-bold mb-2">
+              {fplData ? fplData.web_name : `Player #${playerId.toString()}`}
+            </h1>
+            {fplData && (
+              <div className="flex gap-4 text-gray-600">
+                <span>{fplPlayer?.position}</span>
+                <span>•</span>
+                <span>{fplPlayer?.team}</span>
+                <span>•</span>
+                <span className="text-green-600 font-semibold">
+                  {fplData.total_points} pts
+                </span>
+              </div>
+            )}
           </div>
           <button
             onClick={() => router.back()}
@@ -127,10 +86,26 @@ export default function PlayerDetailPage() {
       </div>
 
       {/* Key Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-6">
         <div className="bg-white rounded-lg shadow-md p-4">
-          <p className="text-sm text-gray-600">Base Price</p>
-          <p className="text-xl font-bold">{formatChips(basePrice)}</p>
+          <p className="text-sm text-gray-600">FPL Price</p>
+          <p className="text-xl font-bold">
+            {fplData ? `£${(fplData.now_cost / 10).toFixed(1)}m` : '-'}
+          </p>
+        </div>
+        <div className="bg-white rounded-lg shadow-md p-4">
+          <p className="text-sm text-gray-600">Ownership</p>
+          <p className="text-xl font-bold">
+            {fplData ? `${parseFloat(fplData.selected_by_percent).toFixed(1)}%` : '-'}
+          </p>
+        </div>
+        <div className="bg-white rounded-lg shadow-md p-4">
+          <p className="text-sm text-gray-600">Form</p>
+          <p className={`text-xl font-bold ${
+            fplData && parseFloat(fplData.form) > 5 ? 'text-green-600' : 'text-gray-900'
+          }`}>
+            {fplData ? parseFloat(fplData.form).toFixed(1) : '-'}
+          </p>
         </div>
         <div className="bg-white rounded-lg shadow-md p-4">
           <p className="text-sm text-gray-600">Buy Price</p>
@@ -144,11 +119,43 @@ export default function PlayerDetailPage() {
           <p className="text-sm text-gray-600">Total Shares</p>
           <p className="text-xl font-bold">{shares.toString()}</p>
         </div>
-        <div className="bg-white rounded-lg shadow-md p-4">
-          <p className="text-sm text-gray-600">Slope</p>
-          <p className="text-xl font-bold">{slope.toString()}</p>
-        </div>
       </div>
+
+      {/* Live Stats Card (if gameweek is active) */}
+      {liveStats && currentGameweek?.is_current && (
+        <div className="bg-gradient-to-r from-red-50 to-orange-50 border-2 border-red-200 rounded-lg shadow-md p-6 mb-6">
+          <h2 className="text-xl font-semibold mb-4 flex items-center">
+            <span className="w-3 h-3 bg-red-600 rounded-full animate-pulse mr-2"></span>
+            Live GW{currentGameweek.id} Stats
+          </h2>
+          <div className="grid grid-cols-3 md:grid-cols-6 gap-4">
+            <div>
+              <p className="text-sm text-gray-600">Points</p>
+              <p className="text-2xl font-bold text-purple-600">{liveStats.stats?.total_points || 0}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-600">Minutes</p>
+              <p className="text-2xl font-bold">{liveStats.stats?.minutes || 0}'</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-600">Goals</p>
+              <p className="text-2xl font-bold text-green-600">{liveStats.stats?.goals_scored || 0}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-600">Assists</p>
+              <p className="text-2xl font-bold text-blue-600">{liveStats.stats?.assists || 0}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-600">Bonus</p>
+              <p className="text-2xl font-bold text-orange-600">{liveStats.stats?.bonus || 0}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-600">BPS</p>
+              <p className="text-2xl font-bold">{liveStats.stats?.bps || 0}</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Trading Card */}
       <div className="bg-white rounded-lg shadow-md p-6 mb-6">
@@ -201,148 +208,125 @@ export default function PlayerDetailPage() {
 
         <div className="p-6">
           {/* Overview Tab */}
-          {activeTab === 'overview' && (
+          {activeTab === 'overview' && fplData && (
             <div>
-              <h3 className="text-xl font-semibold mb-4">Performance Chart</h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-6">
+                <div>
+                  <p className="text-sm text-gray-600">Points Per Game</p>
+                  <p className="text-xl font-bold">{fplData.points_per_game}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">xG</p>
+                  <p className="text-xl font-bold text-purple-600">
+                    {parseFloat(fplData.expected_goals).toFixed(2)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">xA</p>
+                  <p className="text-xl font-bold text-blue-600">
+                    {parseFloat(fplData.expected_assists).toFixed(2)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">ICT Index</p>
+                  <p className="text-xl font-bold">{parseFloat(fplData.ict_index).toFixed(1)}</p>
+                </div>
+              </div>
+
+              <h3 className="text-xl font-semibold mb-4">Performance Metrics</h3>
+              <div className="grid grid-cols-3 gap-4 mb-6">
+                <div className="text-center p-4 bg-red-50 rounded-lg">
+                  <p className="text-sm text-gray-600">Threat</p>
+                  <p className="text-2xl font-bold text-red-600">
+                    {parseFloat(fplData.threat).toFixed(1)}
+                  </p>
+                </div>
+                <div className="text-center p-4 bg-blue-50 rounded-lg">
+                  <p className="text-sm text-gray-600">Creativity</p>
+                  <p className="text-2xl font-bold text-blue-600">
+                    {parseFloat(fplData.creativity).toFixed(1)}
+                  </p>
+                </div>
+                <div className="text-center p-4 bg-green-50 rounded-lg">
+                  <p className="text-sm text-gray-600">Influence</p>
+                  <p className="text-2xl font-bold text-green-600">
+                    {parseFloat(fplData.influence).toFixed(1)}
+                  </p>
+                </div>
+              </div>
+
+              <h3 className="text-xl font-semibold mb-4">Form Chart</h3>
               <ResponsiveContainer width="100%" height={300}>
                 <LineChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="gameweek" />
-                  <YAxis yAxisId="left" />
-                  <YAxis yAxisId="right" orientation="right" />
+                  <YAxis />
                   <Tooltip />
                   <Legend />
-                  <Line
-                    yAxisId="left"
-                    type="monotone"
-                    dataKey="points"
-                    stroke="#3B82F6"
-                    name="Points"
-                  />
-                  <Line
-                    yAxisId="right"
-                    type="monotone"
-                    dataKey="chips"
-                    stroke="#10B981"
-                    name="Chips Earned"
-                  />
+                  <Line type="monotone" dataKey="points" stroke="#3B82F6" name="Points" />
+                  <Line type="monotone" dataKey="form" stroke="#10B981" name="Form" />
                 </LineChart>
               </ResponsiveContainer>
             </div>
           )}
 
           {/* Stats Tab */}
-          {activeTab === 'stats' && stats && (
+          {activeTab === 'stats' && fplData && (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
               <div>
                 <p className="text-sm text-gray-600">Minutes Played</p>
-                <p className="text-2xl font-bold">{stats.minutesPlayed}</p>
+                <p className="text-2xl font-bold">{fplData.minutes}</p>
               </div>
               <div>
                 <p className="text-sm text-gray-600">Goals</p>
-                <p className="text-2xl font-bold text-green-600">{stats.goals}</p>
+                <p className="text-2xl font-bold text-green-600">{fplData.goals_scored}</p>
               </div>
               <div>
                 <p className="text-sm text-gray-600">Assists</p>
-                <p className="text-2xl font-bold text-blue-600">{stats.assists}</p>
+                <p className="text-2xl font-bold text-blue-600">{fplData.assists}</p>
               </div>
               <div>
                 <p className="text-sm text-gray-600">Clean Sheets</p>
-                <p className="text-2xl font-bold">{stats.cleanSheets}</p>
+                <p className="text-2xl font-bold">{fplData.clean_sheets}</p>
               </div>
               <div>
                 <p className="text-sm text-gray-600">Yellow Cards</p>
-                <p className="text-2xl font-bold text-yellow-600">{stats.yellowCards}</p>
+                <p className="text-2xl font-bold text-yellow-600">{fplData.yellow_cards}</p>
               </div>
               <div>
                 <p className="text-sm text-gray-600">Red Cards</p>
-                <p className="text-2xl font-bold text-red-600">{stats.redCards}</p>
+                <p className="text-2xl font-bold text-red-600">{fplData.red_cards}</p>
               </div>
               <div>
                 <p className="text-sm text-gray-600">Saves</p>
-                <p className="text-2xl font-bold">{stats.saves}</p>
+                <p className="text-2xl font-bold">{fplData.saves}</p>
               </div>
               <div>
                 <p className="text-sm text-gray-600">Bonus Points</p>
-                <p className="text-2xl font-bold text-purple-600">{stats.bonus}</p>
+                <p className="text-2xl font-bold text-purple-600">{fplData.bonus}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Penalties Saved</p>
+                <p className="text-2xl font-bold">{fplData.penalties_saved}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Penalties Missed</p>
+                <p className="text-2xl font-bold">{fplData.penalties_missed}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Own Goals</p>
+                <p className="text-2xl font-bold">{fplData.own_goals}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Transfers In (GW)</p>
+                <p className="text-2xl font-bold text-green-600">
+                  {fplData.transfers_in_event.toLocaleString()}
+                </p>
               </div>
             </div>
           )}
 
-          {/* History Tab */}
-          {activeTab === 'history' && (
-            <div>
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-2">Gameweek</th>
-                    <th className="text-left py-2">Points</th>
-                    <th className="text-left py-2">Chips Earned</th>
-                    <th className="text-left py-2">Chips/Point</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {performances.map((perf) => (
-                    <tr key={perf.gameweek} className="border-b">
-                      <td className="py-2">GW{perf.gameweek}</td>
-                      <td className="py-2 font-semibold">{perf.points}</td>
-                      <td className="py-2 text-green-600">{formatChips(perf.chipsEarned)}</td>
-                      <td className="py-2">
-                        {perf.points > 0 
-                          ? formatChips(perf.chipsEarned / BigInt(perf.points))
-                          : '-'
-                        }
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {/* Fixtures Tab */}
-          {activeTab === 'fixtures' && (
-            <div>
-              <h3 className="text-xl font-semibold mb-4">Upcoming Fixtures</h3>
-              <div className="space-y-3">
-                {fixtures.map((fixture) => (
-                  <div
-                    key={fixture.gameweek}
-                    className="flex justify-between items-center p-4 bg-gray-50 rounded-lg"
-                  >
-                    <div className="flex items-center gap-4">
-                      <span className="text-sm font-semibold text-gray-600">
-                        GW{fixture.gameweek}
-                      </span>
-                      <span className={`px-2 py-1 rounded text-xs font-semibold ${
-                        fixture.home ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'
-                      }`}>
-                        {fixture.home ? 'Home' : 'Away'}
-                      </span>
-                    </div>
-                    <div className="text-center">
-                      <p className="font-semibold">{fixture.opponent}</p>
-                      <p className="text-sm text-gray-600">{fixture.date}</p>
-                    </div>
-                    <div className={`px-3 py-1 rounded ${
-                      fixture.opponent.includes('Liverpool') || fixture.opponent.includes('Arsenal')
-                        ? 'bg-red-100 text-red-800'
-                        : fixture.opponent.includes('Chelsea') || fixture.opponent.includes('Man United')
-                        ? 'bg-yellow-100 text-yellow-800'
-                        : 'bg-green-100 text-green-800'
-                    }`}>
-                      {fixture.opponent.includes('Liverpool') || fixture.opponent.includes('Arsenal')
-                        ? 'Hard'
-                        : fixture.opponent.includes('Chelsea') || fixture.opponent.includes('Man United')
-                        ? 'Medium'
-                        : 'Easy'
-                      }
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          {/* History and Fixtures tabs would be implemented similarly */}
         </div>
       </div>
     </div>
