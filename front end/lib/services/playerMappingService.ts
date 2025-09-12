@@ -1,5 +1,6 @@
 
 import { fplService, FPLPlayer } from './fplService';
+import { PLAYER_MAPPINGS, PlayerMappingConfig } from '../config/playerMappings';
 
 export interface PlayerMapping {
   blockchainId: bigint;
@@ -15,38 +16,60 @@ class PlayerMappingService {
   private blockchainToFpl: Map<string, number> = new Map();
   private initialized = false;
 
-  // Initialize mappings - in production, this would come from a database
   async initialize() {
     if (this.initialized) return;
 
-    const players = await fplService.getPlayers();
-    const teams = await fplService.getTeams();
+    try {
+      const players = await fplService.getPlayers();
+      const teams = await fplService.getTeams();
 
-    // For now, we'll map the top 100 players by total points to blockchain IDs
-    // In production, you'd have a proper mapping stored in a database
-    const topPlayers = players
-      .sort((a, b) => b.total_points - a.total_points)
-      .slice(0, 100);
+      // Use configured mappings
+      PLAYER_MAPPINGS.forEach((config: PlayerMappingConfig) => {
+        const blockchainId = BigInt(config.blockchainId);
+        
+        // Find the actual FPL player data
+        const fplPlayer = players.find(p => p.id === config.fplId);
+        const team = fplPlayer ? teams.find(t => t.id === fplPlayer.team) : null;
+        
+        const mapping: PlayerMapping = {
+          blockchainId,
+          fplId: config.fplId,
+          name: fplPlayer?.web_name || config.name,
+          team: team?.name || config.team,
+          position: fplPlayer ? fplService.getPositionShort(fplPlayer.element_type) : config.position,
+        };
 
-    topPlayers.forEach((player, index) => {
-      const blockchainId = BigInt(index + 1);
-      const team = teams.find(t => t.id === player.team);
+        this.mappings.set(`blockchain-${blockchainId}`, mapping);
+        this.mappings.set(`fpl-${config.fplId}`, mapping);
+        this.fplToBlockchain.set(config.fplId, blockchainId);
+        this.blockchainToFpl.set(blockchainId.toString(), config.fplId);
+      });
+
+      this.initialized = true;
+      console.log(`Initialized ${PLAYER_MAPPINGS.length} player mappings`);
+    } catch (error) {
+      console.error('Failed to initialize player mappings:', error);
+      // Use fallback data from config if FPL API fails
+      PLAYER_MAPPINGS.forEach((config: PlayerMappingConfig) => {
+        const blockchainId = BigInt(config.blockchainId);
+        
+        const mapping: PlayerMapping = {
+          blockchainId,
+          fplId: config.fplId,
+          name: config.name,
+          team: config.team,
+          position: config.position,
+        };
+
+        this.mappings.set(`blockchain-${blockchainId}`, mapping);
+        this.mappings.set(`fpl-${config.fplId}`, mapping);
+        this.fplToBlockchain.set(config.fplId, blockchainId);
+        this.blockchainToFpl.set(blockchainId.toString(), config.fplId);
+      });
       
-      const mapping: PlayerMapping = {
-        blockchainId,
-        fplId: player.id,
-        name: player.web_name,
-        team: team?.name || 'Unknown',
-        position: fplService.getPositionShort(player.element_type),
-      };
-
-      this.mappings.set(`blockchain-${blockchainId}`, mapping);
-      this.mappings.set(`fpl-${player.id}`, mapping);
-      this.fplToBlockchain.set(player.id, blockchainId);
-      this.blockchainToFpl.set(blockchainId.toString(), player.id);
-    });
-
-    this.initialized = true;
+      this.initialized = true;
+      console.log('Using fallback player mappings from config');
+    }
   }
 
   async getBlockchainId(fplId: number): Promise<bigint | null> {
@@ -107,7 +130,19 @@ class PlayerMappingService {
     if (!fplId) return null;
 
     const liveData = await fplService.getLiveGameweekData(gameweek);
-    return liveData.elements[fplId.toString()];
+    const stats = liveData.elements[fplId.toString()];
+    
+    if (!stats) return null;
+
+    const mapping = await this.getPlayerMapping(blockchainId);
+    return {
+      blockchainId: blockchainId.toString(),
+      fplId,
+      name: mapping?.name || 'Unknown',
+      team: mapping?.team || 'Unknown',
+      position: mapping?.position || 'UNK',
+      stats: stats.stats
+    };
   }
 
   // Get historical performance for a blockchain player ID
@@ -116,6 +151,18 @@ class PlayerMappingService {
     if (!fplId) return null;
 
     return fplService.getPlayerHistory(fplId);
+  }
+
+  // Check if a blockchain ID is mapped
+  async isMapped(blockchainId: bigint): Promise<boolean> {
+    await this.initialize();
+    return this.blockchainToFpl.has(blockchainId.toString());
+  }
+
+  // Get unmapped blockchain IDs from a list
+  async getUnmappedIds(blockchainIds: bigint[]): Promise<bigint[]> {
+    await this.initialize();
+    return blockchainIds.filter(id => !this.blockchainToFpl.has(id.toString()));
   }
 }
 
