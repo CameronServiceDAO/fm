@@ -1,0 +1,183 @@
+[
+	{
+		"inputs": [],
+		"stateMutability": "nonpayable",
+		"type": "constructor"
+	},
+	{
+		"inputs": [],
+		"name": "NotOwner",
+		"type": "error"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "gameweeks",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "players",
+				"type": "uint256"
+			}
+		],
+		"name": "DummyDataSeeded",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "uint256",
+				"name": "gameweek",
+				"type": "uint256"
+			},
+			{
+				"indexed": true,
+				"internalType": "uint256",
+				"name": "playerId",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "points",
+				"type": "uint256"
+			}
+		],
+		"name": "PointsSet",
+		"type": "event"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "gameweek",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "playerId",
+				"type": "uint256"
+			}
+		],
+		"name": "getPoints",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "pts",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "gameweek",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256[]",
+				"name": "playerIds",
+				"type": "uint256[]"
+			}
+		],
+		"name": "getPointsBatch",
+		"outputs": [
+			{
+				"internalType": "uint256[]",
+				"name": "out",
+				"type": "uint256[]"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "owner",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "seedDummy3GW",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "seeded",
+		"outputs": [
+			{
+				"internalType": "bool",
+				"name": "",
+				"type": "bool"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "gameweek",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "playerId",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "pts",
+				"type": "uint256"
+			}
+		],
+		"name": "setPoints",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "gameweek",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256[]",
+				"name": "playerIds",
+				"type": "uint256[]"
+			},
+			{
+				"internalType": "uint256[]",
+				"name": "pts",
+				"type": "uint256[]"
+			}
+		],
+		"name": "setPointsBatch",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	}
+]
