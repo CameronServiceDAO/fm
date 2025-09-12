@@ -1,4 +1,4 @@
-
+// front end/app/api/fpl/players/route.ts
 import { NextResponse } from 'next/server';
 import { fplService } from '@/lib/services/fplService';
 import { playerMappingService } from '@/lib/services/playerMappingService';
@@ -6,55 +6,96 @@ import { playerMappingService } from '@/lib/services/playerMappingService';
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const gameweek = searchParams.get('gameweek');
     const blockchainId = searchParams.get('blockchainId');
+    const search = searchParams.get('search');
+    const fplId = searchParams.get('fplId');
 
-    if (!gameweek) {
-      return NextResponse.json(
-        { error: 'Gameweek parameter is required' },
-        { status: 400 }
-      );
-    }
-
-    const liveData = await fplService.getLiveGameweekData(parseInt(gameweek));
-
-    // Get live stats for specific blockchain player
+    // Get player by blockchain ID
     if (blockchainId) {
-      const stats = await playerMappingService.getLiveStats(
-        BigInt(blockchainId),
-        parseInt(gameweek)
-      );
-      
-      if (!stats) {
+      const mapping = await playerMappingService.getPlayerMapping(BigInt(blockchainId));
+      if (!mapping) {
         return NextResponse.json({ error: 'Player not found' }, { status: 404 });
       }
 
-      return NextResponse.json(stats);
+      const fplData = await playerMappingService.getFplPlayerData(BigInt(blockchainId));
+      if (!fplData) {
+        return NextResponse.json({ error: 'FPL data not found' }, { status: 404 });
+      }
+
+      const teams = await fplService.getTeams();
+      const team = teams.find(t => t.id === fplData.team);
+
+      return NextResponse.json({
+        blockchainId: mapping.blockchainId.toString(),
+        fplId: mapping.fplId,
+        name: mapping.name,
+        team: team?.name || 'Unknown',
+        position: fplService.getPositionShort(fplData.element_type),
+        fplData
+      });
     }
 
-    // Get all live data with blockchain mappings
-    const allMappings = await playerMappingService.getAllMappings();
-    const liveStats = await Promise.all(
-      allMappings.map(async (mapping) => {
-        const fplId = mapping.fplId;
-        const stats = liveData.elements[fplId.toString()];
-        
-        return {
-          blockchainId: mapping.blockchainId.toString(),
-          fplId: mapping.fplId,
-          name: mapping.name,
-          team: mapping.team,
-          position: mapping.position,
-          stats: stats?.stats || null,
-        };
-      })
-    );
+    // Search players
+    if (search) {
+      const results = await playerMappingService.searchPlayers(search);
+      const enhancedResults = await Promise.all(
+        results.map(async (mapping) => {
+          const fplData = await fplService.getPlayer(mapping.fplId);
+          return {
+            ...mapping,
+            blockchainId: mapping.blockchainId.toString(),
+            fplData
+          };
+        })
+      );
+      return NextResponse.json(enhancedResults);
+    }
 
-    return NextResponse.json(liveStats.filter(s => s.stats !== null));
+    // Get player by FPL ID
+    if (fplId) {
+      const fplData = await fplService.getPlayer(parseInt(fplId));
+      if (!fplData) {
+        return NextResponse.json({ error: 'Player not found' }, { status: 404 });
+      }
+
+      const blockchainId = await playerMappingService.getBlockchainId(parseInt(fplId));
+      const teams = await fplService.getTeams();
+      const team = teams.find(t => t.id === fplData.team);
+
+      return NextResponse.json({
+        blockchainId: blockchainId?.toString() || null,
+        fplId: fplData.id,
+        name: fplData.web_name,
+        team: team?.name || 'Unknown',
+        position: fplService.getPositionShort(fplData.element_type),
+        fplData
+      });
+    }
+
+    // Get all mapped players
+    const mappings = await playerMappingService.getAllMappings();
+    const players = await fplService.getPlayers();
+    const teams = await fplService.getTeams();
+
+    const enhancedPlayers = mappings.map(mapping => {
+      const fplData = players.find(p => p.id === mapping.fplId);
+      const team = teams.find(t => t.id === fplData?.team);
+      
+      return {
+        blockchainId: mapping.blockchainId.toString(),
+        fplId: mapping.fplId,
+        name: mapping.name,
+        team: team?.name || 'Unknown',
+        position: mapping.position,
+        fplData: fplData || null
+      };
+    });
+
+    return NextResponse.json(enhancedPlayers);
   } catch (error) {
-    console.error('Error fetching live data:', error);
+    console.error('Error fetching players:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch live data' },
+      { error: 'Failed to fetch players' },
       { status: 500 }
     );
   }
