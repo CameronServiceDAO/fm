@@ -2,23 +2,5 @@
   "buildCommand": "cd \"front end\" && npm run build",
   "outputDirectory": "front end/.next",
   "installCommand": "cd \"front end\" && npm install",
-  "framework": "nextjs",
-  "regions": ["iad1"],
-  "functions": {
-    "front end/app/api/fpl/players/route.ts": {
-      "maxDuration": 10
-    },
-    "front end/app/api/fpl/gameweek/route.ts": {
-      "maxDuration": 10
-    },
-    "front end/app/api/fpl/fixtures/route.ts": {
-      "maxDuration": 10
-    },
-    "front end/app/api/fpl/live/route.ts": {
-      "maxDuration": 10
-    },
-    "front end/app/api/fpl/players/[blockchainId]/history/route.ts": {
-      "maxDuration": 10
-    }
-  }
+  "framework": "nextjs"
 }
