@@ -20,11 +20,5 @@
     "front end/app/api/fpl/players/[blockchainId]/history/route.ts": {
       "maxDuration": 10
     }
-  },
-  "env": {
-    "NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID": "@wallet_connect_project_id",
-    "NEXT_PUBLIC_FANTASY_CORE_ADDRESS": "@fantasy_core_address",
-    "NEXT_PUBLIC_POINTS_STORE_ADDRESS": "@points_store_address",
-    "NEXT_PUBLIC_USDC_ADDRESS": "@usdc_address"
   }
 }
