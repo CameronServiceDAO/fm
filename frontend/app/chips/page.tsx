@@ -30,11 +30,19 @@ export default function ChipsPage() {
 
   // Calculate chips output
   const calculateChipsOut = (usdcAmount: bigint): bigint => {
-    if (!totalChips || !prizePool || totalChips === BigInt(0) || prizePool === BigInt(0)) {
-      return usdcAmount; // 1:1 for bootstrap
-    }
-    return (totalChips * usdcAmount) / prizePool;
-  };
+  if (!totalChips || !prizePool) {
+    return usdcAmount; // 1:1 for bootstrap
+  }
+  
+  const totalChipsBigInt = BigInt(totalChips.toString());
+  const prizePoolBigInt = BigInt(prizePool.toString());
+  
+  if (totalChipsBigInt === BigInt(0) || prizePoolBigInt === BigInt(0)) {
+    return usdcAmount; // 1:1 for bootstrap
+  }
+  
+  return (totalChipsBigInt * usdcAmount) / prizePoolBigInt;
+};
 
   const handleBuyChips = async () => {
     if (!amount || parseFloat(amount) <= 0) {
