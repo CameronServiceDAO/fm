@@ -28,21 +28,18 @@ export default function ChipsPage() {
     args: address ? [address] : undefined,
   });
 
-  // Calculate chips output
+  // Calculate chips output with proper type handling
   const calculateChipsOut = (usdcAmount: bigint): bigint => {
-  if (!totalChips || !prizePool) {
-    return usdcAmount; // 1:1 for bootstrap
-  }
-  
-  const totalChipsBigInt = BigInt(totalChips.toString());
-  const prizePoolBigInt = BigInt(prizePool.toString());
-  
-  if (totalChipsBigInt === BigInt(0) || prizePoolBigInt === BigInt(0)) {
-    return usdcAmount; // 1:1 for bootstrap
-  }
-  
-  return (totalChipsBigInt * usdcAmount) / prizePoolBigInt;
-};
+    // Safely convert to bigint
+    const totalChipsBigInt = totalChips ? BigInt(totalChips.toString()) : BigInt(0);
+    const prizePoolBigInt = prizePool ? BigInt(prizePool.toString()) : BigInt(0);
+    
+    if (totalChipsBigInt === BigInt(0) || prizePoolBigInt === BigInt(0)) {
+      return usdcAmount; // 1:1 for bootstrap
+    }
+    
+    return (totalChipsBigInt * usdcAmount) / prizePoolBigInt;
+  };
 
   const handleBuyChips = async () => {
     if (!amount || parseFloat(amount) <= 0) {
@@ -113,6 +110,11 @@ export default function ChipsPage() {
 
   const usdcAmount = amount ? parseUnits(amount, 6) : BigInt(0);
   const estimatedChips = calculateChipsOut(usdcAmount);
+  
+  // Safely convert balance values to bigint
+  const chipBalanceBigInt = chipBalance ? BigInt(chipBalance.toString()) : BigInt(0);
+  const usdcBalanceBigInt = usdcBalance ? BigInt(usdcBalance.toString()) : BigInt(0);
+  const prizePoolBigInt = prizePool ? BigInt(prizePool.toString()) : BigInt(0);
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -123,19 +125,19 @@ export default function ChipsPage() {
         <div className="bg-white rounded-lg shadow-md p-6">
           <h3 className="text-sm text-gray-600 mb-2">Your Chips</h3>
           <p className="text-2xl font-bold text-blue-600">
-            {formatChips(chipBalance || BigInt(0))}
+            {formatChips(chipBalanceBigInt)}
           </p>
         </div>
         <div className="bg-white rounded-lg shadow-md p-6">
           <h3 className="text-sm text-gray-600 mb-2">Your USDC</h3>
           <p className="text-2xl font-bold text-green-600">
-            {formatUSDC(usdcBalance || BigInt(0))}
+            {formatUSDC(usdcBalanceBigInt)}
           </p>
         </div>
         <div className="bg-white rounded-lg shadow-md p-6">
           <h3 className="text-sm text-gray-600 mb-2">Prize Pool</h3>
           <p className="text-2xl font-bold text-purple-600">
-            {formatUSDC(prizePool || BigInt(0))}
+            {formatUSDC(prizePoolBigInt)}
           </p>
         </div>
       </div>
