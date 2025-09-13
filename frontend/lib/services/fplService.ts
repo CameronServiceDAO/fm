@@ -110,6 +110,7 @@ export interface FPLLiveData {
         bps: number;
         total_points: number;
       };
+      explain?: any;
     };
   };
 }
