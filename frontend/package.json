@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "type-check": "tsc --noEmit",
+    "postinstall": "npm ls pino-pretty || npm install pino-pretty || true"
   },
   "dependencies": {
     "next": "14.2.0",
@@ -34,5 +36,11 @@
     "postcss": "^8.4.0",
     "eslint": "^8.56.0",
     "eslint-config-next": "14.2.0"
+  },
+  "optionalDependencies": {
+    "pino-pretty": "^10.3.0"
+  },
+  "overrides": {
+    "pino-pretty": "$pino-pretty"
   }
 }

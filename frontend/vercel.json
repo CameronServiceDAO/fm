@@ -1,0 +1,26 @@
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": ".next",
+  "devCommand": "npm run dev",
+  "installCommand": "npm install",
+  "framework": "nextjs",
+  "nodeVersion": "20.x",
+  "regions": ["iad1"],
+  "functions": {
+    "app/api/fpl/fixtures/route.ts": {
+      "maxDuration": 10
+    },
+    "app/api/fpl/gameweek/route.ts": {
+      "maxDuration": 10
+    },
+    "app/api/fpl/live/route.ts": {
+      "maxDuration": 10
+    },
+    "app/api/fpl/players/*/route.ts": {
+      "maxDuration": 10
+    }
+  },
+  "env": {
+    "NODE_OPTIONS": "--max-old-space-size=4096"
+  }
+}

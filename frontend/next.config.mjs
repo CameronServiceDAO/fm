@@ -18,7 +18,7 @@ const nextConfig = {
   },
 
   // Webpack configuration
-  webpack: (config) => {
+  webpack: (config, { isServer }) => {
     // Fix for wagmi/viem BigInt serialization
     config.resolve.fallback = { 
       fs: false,
@@ -32,6 +32,17 @@ const nextConfig = {
       include: /node_modules/,
       type: 'javascript/auto',
     });
+
+    // Fix for pino-pretty module not found
+    if (!isServer) {
+      config.resolve.alias = {
+        ...config.resolve.alias,
+        'pino-pretty': false,
+      };
+    }
+
+    // External packages that should not be bundled
+    config.externals.push('pino-pretty');
 
     return config;
   },
@@ -88,7 +99,9 @@ const nextConfig = {
 
   // Output configuration for deployment
   output: 'standalone',
+
+  // Transpile packages that need it
+  transpilePackages: ['@rainbow-me/rainbowkit', '@wagmi/core', '@wagmi/connectors'],
 };
 
 export default nextConfig;
-

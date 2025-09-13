@@ -30,7 +30,7 @@ export default function ChipsPage() {
 
   // Calculate chips output
   const calculateChipsOut = (usdcAmount: bigint): bigint => {
-    if (!totalChips || !prizePool || totalChips === 0n || prizePool === 0n) {
+    if (!totalChips || !prizePool || totalChips === BigInt(0) || prizePool === BigInt(0)) {
       return usdcAmount; // 1:1 for bootstrap
     }
     return (totalChips * usdcAmount) / prizePool;
@@ -45,7 +45,7 @@ export default function ChipsPage() {
     try {
       const usdcAmount = parseUnits(amount, 6); // USDC has 6 decimals
       const estimatedChips = calculateChipsOut(usdcAmount);
-      const minChipsOut = (estimatedChips * 99n) / 100n; // 1% slippage
+      const minChipsOut = (estimatedChips * BigInt(99)) / BigInt(100); // 1% slippage
 
       setIsApproving(true);
       
@@ -103,7 +103,7 @@ export default function ChipsPage() {
     );
   }
 
-  const usdcAmount = amount ? parseUnits(amount, 6) : 0n;
+  const usdcAmount = amount ? parseUnits(amount, 6) : BigInt(0);
   const estimatedChips = calculateChipsOut(usdcAmount);
 
   return (
@@ -115,19 +115,19 @@ export default function ChipsPage() {
         <div className="bg-white rounded-lg shadow-md p-6">
           <h3 className="text-sm text-gray-600 mb-2">Your Chips</h3>
           <p className="text-2xl font-bold text-blue-600">
-            {formatChips(chipBalance || 0n)}
+            {formatChips(chipBalance || BigInt(0))}
           </p>
         </div>
         <div className="bg-white rounded-lg shadow-md p-6">
           <h3 className="text-sm text-gray-600 mb-2">Your USDC</h3>
           <p className="text-2xl font-bold text-green-600">
-            {formatUSDC(usdcBalance || 0n)}
+            {formatUSDC(usdcBalance || BigInt(0))}
           </p>
         </div>
         <div className="bg-white rounded-lg shadow-md p-6">
           <h3 className="text-sm text-gray-600 mb-2">Prize Pool</h3>
           <p className="text-2xl font-bold text-purple-600">
-            {formatUSDC(prizePool || 0n)}
+            {formatUSDC(prizePool || BigInt(0))}
           </p>
         </div>
       </div>
@@ -187,7 +187,7 @@ export default function ChipsPage() {
             <div className="flex justify-between items-center mt-2">
               <span className="text-gray-600">Exchange Rate:</span>
               <span className="text-sm">
-                1 USDC = {estimatedChips && usdcAmount > 0n 
+                1 USDC = {estimatedChips && usdcAmount > BigInt(0) 
                   ? (Number(estimatedChips) / Number(usdcAmount) * 1e6).toFixed(2)
                   : '1.00'
                 } chips
