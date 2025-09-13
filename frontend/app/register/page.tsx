@@ -86,7 +86,7 @@ export default function RegisterPage() {
     return (
       <div className="max-w-2xl mx-auto text-center py-12">
         <h1 className="text-3xl font-bold mb-4">Already Registered</h1>
-        <p className="text-gray-600 mb-8">You're already registered on the platform!</p>
+        <p className="text-gray-600 mb-8">You&apos;re already registered on the platform!</p>
         <button
           onClick={() => router.push('/profile')}
           className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition"
@@ -153,7 +153,7 @@ export default function RegisterPage() {
             <li>Your profile will be created on the blockchain</li>
             <li>You can buy chips to start trading players</li>
             <li>Build your squad and earn points each gameweek</li>
-            <li>Claim chips based on your players' performance</li>
+            <li>Claim chips based on your players&apos; performance</li>
             <li>Redeem chips for USDC at the end of the season</li>
           </ul>
         </div>

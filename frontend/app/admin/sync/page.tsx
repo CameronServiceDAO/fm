@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAccount, useWriteContract } from 'wagmi';
 import { CONTRACT_ADDRESSES } from '@/lib/contracts/config';
 import GameweekPointsStoreABI from '@/lib/abis/GameweekPointsStore.json';
@@ -40,17 +40,6 @@ export default function AdminSyncPage() {
     }
   }, [address]);
 
-  // Auto-sync handler
-  useEffect(() => {
-    if (autoSync && currentGameweek) {
-      const interval = setInterval(() => {
-        checkAndSyncGameweek(currentGameweek.id - 1);
-      }, 60000); // Check every minute
-      
-      return () => clearInterval(interval);
-    }
-  }, [autoSync, currentGameweek]);
-
   const fetchGameweekPoints = async (gameweek: number) => {
     try {
       const liveData = await fplService.getLiveGameweekData(gameweek);
@@ -75,7 +64,7 @@ export default function AdminSyncPage() {
     }
   };
 
-  const syncGameweekPoints = async (gameweek: number) => {
+  const syncGameweekPoints = useCallback(async (gameweek: number) => {
     const status: SyncStatus = {
       gameweek,
       status: 'syncing',
@@ -133,14 +122,25 @@ export default function AdminSyncPage() {
       setSyncStatuses(prev => new Map(prev).set(gameweek, status));
       toast.error(`Failed to sync GW${gameweek}`);
     }
-  };
+  }, [writeContract]);
 
-  const checkAndSyncGameweek = async (gameweek: number) => {
+  const checkAndSyncGameweek = useCallback(async (gameweek: number) => {
     const gw = gameweeks.find(g => g.id === gameweek);
     if (gw?.finished && !syncStatuses.get(gameweek)?.status) {
       await syncGameweekPoints(gameweek);
     }
-  };
+  }, [gameweeks, syncStatuses, syncGameweekPoints]);
+
+  // Auto-sync handler
+  useEffect(() => {
+    if (autoSync && currentGameweek) {
+      const interval = setInterval(() => {
+        checkAndSyncGameweek(currentGameweek.id - 1);
+      }, 60000); // Check every minute
+      
+      return () => clearInterval(interval);
+    }
+  }, [autoSync, currentGameweek, checkAndSyncGameweek]);
 
   const seedDummyData = async () => {
     try {

@@ -240,7 +240,7 @@ export default function ChipsPage() {
           </div>
           <div className="flex items-start">
             <span className="text-blue-600 mr-2">3.</span>
-            <p>Earn additional chips based on your players' performance</p>
+            <p>Earn additional chips based on your players&apos; performance</p>
           </div>
           <div className="flex items-start">
             <span className="text-blue-600 mr-2">4.</span>

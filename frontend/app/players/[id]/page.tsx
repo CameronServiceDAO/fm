@@ -135,7 +135,7 @@ export default function PlayerDetailPage() {
             </div>
             <div>
               <p className="text-sm text-gray-600">Minutes</p>
-              <p className="text-2xl font-bold">{liveStats.stats?.minutes || 0}'</p>
+              <p className="text-2xl font-bold">{liveStats.stats?.minutes || 0}&apos;</p>
             </div>
             <div>
               <p className="text-sm text-gray-600">Goals</p>
