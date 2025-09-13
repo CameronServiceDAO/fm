@@ -1,6 +1,5 @@
-import type { NextConfig } from 'next';
-
-const nextConfig: NextConfig = {
+/** @type {import('next').NextConfig} */
+const nextConfig = {
   // Enable React Strict Mode for better development experience
   reactStrictMode: true,
 
@@ -65,7 +64,6 @@ const nextConfig: NextConfig = {
   },
 
   // Suppress hydration warnings in development
-  // This is useful when using wagmi/web3 where client and server state may differ
   suppressHydrationWarning: true,
 
   // Experimental features
@@ -93,3 +91,4 @@ const nextConfig: NextConfig = {
 };
 
 export default nextConfig;
+
