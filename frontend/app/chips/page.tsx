@@ -8,6 +8,7 @@ import FantasyCoreABI from '@/lib/abis/FantasyCore.json';
 import MockUSDCABI from '@/lib/abis/MockUSDC.json';
 import { parseUnits } from 'viem';
 import { formatChips, formatUSDC } from '@/lib/utils/format';
+import { safeBigInt } from '@/lib/utils/safeBigint';
 import toast from 'react-hot-toast';
 
 export default function ChipsPage() {
@@ -30,11 +31,10 @@ export default function ChipsPage() {
 
   // Calculate chips output with proper type handling
   const calculateChipsOut = (usdcAmount: bigint): bigint => {
-    // Safely convert to bigint
-    const totalChipsBigInt = totalChips ? BigInt(totalChips.toString()) : BigInt(0);
-    const prizePoolBigInt = prizePool ? BigInt(prizePool.toString()) : BigInt(0);
+    const totalChipsBigInt = safeBigInt(totalChips);
+    const prizePoolBigInt = safeBigInt(prizePool);
     
-    if (totalChipsBigInt === BigInt(0) || prizePoolBigInt === BigInt(0)) {
+    if (totalChipsBigInt === 0n || prizePoolBigInt === 0n) {
       return usdcAmount; // 1:1 for bootstrap
     }
     
@@ -50,7 +50,7 @@ export default function ChipsPage() {
     try {
       const usdcAmount = parseUnits(amount, 6); // USDC has 6 decimals
       const estimatedChips = calculateChipsOut(usdcAmount);
-      const minChipsOut = (estimatedChips * BigInt(99)) / BigInt(100); // 1% slippage
+      const minChipsOut = (estimatedChips * 99n) / 100n; // 1% slippage
 
       setIsApproving(true);
       
@@ -108,13 +108,8 @@ export default function ChipsPage() {
     );
   }
 
-  const usdcAmount = amount ? parseUnits(amount, 6) : BigInt(0);
+  const usdcAmount = amount ? parseUnits(amount, 6) : 0n;
   const estimatedChips = calculateChipsOut(usdcAmount);
-  
-  // Safely convert balance values to bigint
-  const chipBalanceBigInt = chipBalance ? BigInt(chipBalance.toString()) : BigInt(0);
-  const usdcBalanceBigInt = usdcBalance ? BigInt(usdcBalance.toString()) : BigInt(0);
-  const prizePoolBigInt = prizePool ? BigInt(prizePool.toString()) : BigInt(0);
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -125,19 +120,19 @@ export default function ChipsPage() {
         <div className="bg-white rounded-lg shadow-md p-6">
           <h3 className="text-sm text-gray-600 mb-2">Your Chips</h3>
           <p className="text-2xl font-bold text-blue-600">
-            {formatChips(chipBalanceBigInt)}
+            {formatChips(chipBalance)}
           </p>
         </div>
         <div className="bg-white rounded-lg shadow-md p-6">
           <h3 className="text-sm text-gray-600 mb-2">Your USDC</h3>
           <p className="text-2xl font-bold text-green-600">
-            {formatUSDC(usdcBalanceBigInt)}
+            {formatUSDC(usdcBalance)}
           </p>
         </div>
         <div className="bg-white rounded-lg shadow-md p-6">
           <h3 className="text-sm text-gray-600 mb-2">Prize Pool</h3>
           <p className="text-2xl font-bold text-purple-600">
-            {formatUSDC(prizePoolBigInt)}
+            {formatUSDC(prizePool)}
           </p>
         </div>
       </div>
@@ -197,7 +192,7 @@ export default function ChipsPage() {
             <div className="flex justify-between items-center mt-2">
               <span className="text-gray-600">Exchange Rate:</span>
               <span className="text-sm">
-                1 USDC = {estimatedChips && usdcAmount > BigInt(0) 
+                1 USDC = {usdcAmount > 0n 
                   ? (Number(estimatedChips) / Number(usdcAmount) * 1e6).toFixed(2)
                   : '1.00'
                 } chips

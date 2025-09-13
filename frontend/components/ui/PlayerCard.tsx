@@ -38,11 +38,11 @@ export function PlayerCard({ playerId, showActions = true, onBuy, onSell }: Play
       <div className="grid grid-cols-2 gap-4 mb-4">
         <div>
           <p className="text-sm text-gray-600">Buy Price</p>
-          <p className="font-semibold">{formatChips(buyPrice || 0n)}</p>
+          <p className="font-semibold">{formatChips(buyPrice)}</p>
         </div>
         <div>
           <p className="text-sm text-gray-600">Sell Price</p>
-          <p className="font-semibold">{formatChips(sellPrice || 0n)}</p>
+          <p className="font-semibold">{formatChips(sellPrice)}</p>
         </div>
       </div>
       

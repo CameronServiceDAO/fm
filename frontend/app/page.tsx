@@ -41,13 +41,13 @@ export default function HomePage() {
         <div className="bg-white rounded-lg shadow-md p-6 text-center">
           <h3 className="text-sm text-gray-600 mb-2">Prize Pool</h3>
           <p className="text-2xl font-bold text-green-600">
-            {formatUSDC(prizePool || 0n)}
+            {formatUSDC(prizePool)}
           </p>
         </div>
         <div className="bg-white rounded-lg shadow-md p-6 text-center">
           <h3 className="text-sm text-gray-600 mb-2">Total Chips</h3>
           <p className="text-2xl font-bold text-blue-600">
-            {formatChips(totalChips || 0n)}
+            {formatChips(totalChips)}
           </p>
         </div>
         <div className="bg-white rounded-lg shadow-md p-6 text-center">

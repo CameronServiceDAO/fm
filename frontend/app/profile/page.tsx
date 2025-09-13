@@ -94,7 +94,7 @@ export default function ProfilePage() {
           </button>
         </div>
         <div className="text-3xl font-bold text-blue-600">
-          {formatChips(chipBalance || 0n)}
+          {formatChips(chipBalance)}
         </div>
         <p className="text-sm text-gray-600 mt-2">
           Available for trading and redemption

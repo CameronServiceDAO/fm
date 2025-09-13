@@ -141,7 +141,7 @@ export default function SquadPage() {
           </div>
           <div>
             <p className="text-sm text-gray-600">Chip Balance</p>
-            <p className="text-2xl font-bold text-blue-600">{formatChips(chipBalance || 0n)}</p>
+            <p className="text-2xl font-bold text-blue-600">{formatChips(chipBalance)}</p>
           </div>
           <div>
             <p className="text-sm text-gray-600">Current GW</p>

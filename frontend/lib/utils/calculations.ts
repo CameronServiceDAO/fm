@@ -1,24 +1,32 @@
+import { safeBigInt } from './safeBigint';
+
 export function calculatePriceImpact(
-  currentPrice: bigint,
-  newPrice: bigint
+  currentPrice: any,
+  newPrice: any
 ): number {
-  if (currentPrice === 0n) return 0;
-  const impact = ((newPrice - currentPrice) * 10000n) / currentPrice;
+  const currentPriceBigInt = safeBigInt(currentPrice);
+  const newPriceBigInt = safeBigInt(newPrice);
+  
+  if (currentPriceBigInt === 0n) return 0;
+  const impact = ((newPriceBigInt - currentPriceBigInt) * 10000n) / currentPriceBigInt;
   return Number(impact) / 100; // Return as percentage
 }
 
 export function calculateSlippage(
-  expectedAmount: bigint,
+  expectedAmount: any,
   slippagePercent: number
 ): bigint {
+  const expectedAmountBigInt = safeBigInt(expectedAmount);
   const slippageFactor = BigInt(Math.floor((100 + slippagePercent) * 100));
-  return (expectedAmount * slippageFactor) / 10000n;
+  return (expectedAmountBigInt * slippageFactor) / 10000n;
 }
 
 export function calculatePortfolioValue(
-  players: Array<{ shares: bigint; sellPrice: bigint }>
+  players: Array<{ shares: any; sellPrice: any }>
 ): bigint {
   return players.reduce((total, player) => {
-    return total + (player.shares * player.sellPrice);
+    const shares = safeBigInt(player.shares);
+    const sellPrice = safeBigInt(player.sellPrice);
+    return total + (shares * sellPrice);
   }, 0n);
 }
