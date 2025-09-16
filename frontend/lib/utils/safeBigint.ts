@@ -1,4 +1,5 @@
-* Safe BigInt conversion utilities
+/**
+ * Safe BigInt conversion utilities
  * Handles undefined, null, and various input types safely
  */
 
